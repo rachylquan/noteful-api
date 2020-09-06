@@ -1,66 +1,91 @@
+require('dotenv').config();
 const express = require('express');
 const { v4: uuid } = require('uuid');
 const logger = require('../logger');
-const { folders, notes } = require('../store');
+const FoldersService = require('./folders-service');
+const xss = require('xss');
 
 const foldersRouter = express.Router();
 const bodyParser = express.json();
 
+const serializeFolder = (folder) => ({
+  id: folder.id,
+  name: xss(folder.name),
+});
+
 foldersRouter
-  .route('/folders')
-  .get((req, res) => {
-    res.json(folders);
+  .route('/')
+  .get((req, res, next) => {
+    const knexInstance = req.app.get('db');
+    FoldersService.getAllFolders(knexInstance)
+      .then((folders) => {
+        res.json(folders.map(serializeFolder));
+      })
+      .catch(next);
   })
-  .post(bodyParser, (req, res) => {
+  .post(bodyParser, (req, res, next) => {
     const { name } = req.body;
+    const newFolder = { name };
 
     if (!name) {
       logger.error(`Name is required`);
-      return res.status(400).send('Invalid data');
+      return res.status(400).json({
+        error: { message: `Missing 'name' in request body` },
+      });
     }
-
-    const id = uuid();
-
-    const folder = {
-      id,
-      name,
-    };
-
-    folders.push(folder);
-
-    logger.info(`Folder with id ${id} created`);
-
-    res.status(201).location(`http://localhost:800/folders/${id}`).json(folder);
+    FoldersService.insertFolder(req.app.get('db'), newFolder)
+      .then((folder) => {
+        res.status(201).json(serializeFolder(folder));
+      })
+      .catch(next);
   });
 
 foldersRouter
-  .route('/folders/:id')
-  .get((req, res) => {
-    const { id } = req.params;
-    const folder = folders.find((f) => f.id == id);
-
-    // make sure we found a card
-    if (!folder) {
-      logger.error(`Folder with id ${id} not found`);
-      return res.status(404).send('Folder Not Found');
-    }
-
-    res.json(folder);
+  .route('/:folder_id')
+  .all((req, res, next) => {
+    FoldersService.getById(req.app.get('db'), req.params.folder_id)
+      .then((folder) => {
+        if (!folder) {
+          return res.status(404).json({
+            error: { message: `Folder doesn't exist` },
+          });
+        }
+        res.folder = folder; // save the folder for the next middleware
+        next(); // don't forget to call next so the next middleware happens!
+      })
+      .catch(next);
   })
-  .delete((req, res) => {
-    const { id } = req.params;
+  .get((req, res, next) => {
+    res.json(serializeFolder(res.folder));
+  })
+  .delete((req, res, next) => {
+    FoldersService.deleteFolder(req.app.get('db'), req.params.folder_id)
+      .then(() => {
+        res.status(204).end();
+      })
+      .catch(next);
+  })
+  .patch(bodyParser, (req, res, next) => {
+    const { name } = req.body;
+    const folderToUpdate = { name };
 
-    const folderIndex = folders.findIndex((f) => f.id == id);
+    const numberOfValues = Object.values(folderToUpdate).filter(Boolean).length;
+    if (numberOfValues === 0)
+      return res.status(400).json({
+        error: {
+          message: `Request body must contain 'name'`,
+        },
+      });
 
-    if (folderIndex === -1) {
-      logger.error(`Folder with id ${id} not found.`);
-      return res.status(404).send('Not Found');
-    }
-
-    folders.splice(folderIndex, 1);
-
-    logger.info(`Folder with id ${id} deleted.`);
-    res.status(204).end();
+    FoldersService.updateFolder(
+      req.app.get('db'),
+      req.params.folder_id,
+      folderToUpdate
+    )
+      .then((numRowsAffected) => {
+        res.status(204).end();
+      })
+      .catch(next);
   });
 
 module.exports = foldersRouter;
