@@ -3,4 +3,5 @@ CREATE TABLE noteful_notes (
   name TEXT NOT NULL,
   modified TIMESTAMPTZ DEFAULT now() NOT NULL,
   content TEXT
+  folder_id INTEGER REFERENCES noteful_folders(id)
 );
