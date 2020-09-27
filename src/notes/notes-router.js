@@ -40,6 +40,14 @@ notesRouter
       }
     }
 
+    if (folder_id === '...') {
+      logger.error(`${field} is required`);
+
+      return res.status(400).send({
+        error: { message: `Missing '${field}' is required` },
+      });
+    }
+
     NotesService.insertNote(req.app.get('db'), newNote)
       .then((note) => {
         res.status(201).json(serializeNote(note));
