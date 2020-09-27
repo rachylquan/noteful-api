@@ -27,13 +27,17 @@ notesRouter
       .catch(next);
   })
   .post(bodyParser, (req, res, next) => {
-    const { name, content, folder_id } = req.body;
+    const { name, folder_id } = req.body;
     const newNote = { name, content, folder_id };
 
-    if (!name) {
-      return res.status(400).json({
-        error: { message: `Missing 'name' in request body` },
-      });
+    for (const field of ['name', 'folder_id']) {
+      if (!req.body[field]) {
+        logger.error(`${field} is required`);
+
+        return res.status(400).send({
+          error: { message: `Missing '${field}' is required` },
+        });
+      }
     }
 
     NotesService.insertNote(req.app.get('db'), newNote)
