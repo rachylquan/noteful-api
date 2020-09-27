@@ -40,11 +40,11 @@ notesRouter
       }
     }
 
-    if (folder_id === '...') {
-      logger.error(`${field} is required`);
+    if (folder_id === '') {
+      logger.error(`'folder_id' is required`);
 
       return res.status(400).send({
-        error: { message: `Missing '${field}' is required` },
+        error: { message: `Missing 'folder_id' is required` },
       });
     }
 
