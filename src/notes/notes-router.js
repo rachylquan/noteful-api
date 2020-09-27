@@ -27,10 +27,10 @@ notesRouter
       .catch(next);
   })
   .post(bodyParser, (req, res, next) => {
-    const { name, folder_id } = req.body;
+    const { name, content, folder_id } = req.body;
     const newNote = { name, content, folder_id };
 
-    for (const field of ['name', 'folder_id']) {
+    for (const field of ['name', 'folder_id', 'content']) {
       if (!req.body[field]) {
         logger.error(`${field} is required`);
 
